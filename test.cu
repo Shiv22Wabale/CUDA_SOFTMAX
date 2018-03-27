@@ -25,6 +25,7 @@ void saxpy(float n, float a, float *x, float *w)
 {
 	int index = blockIdx.x * blockDim.x + threadIdx.x;
 	int stride = blockDim.x * gridDim.x;
+	printf("%d", index);
 	for (int i = index; i < n; i += stride)
 		w[i] = w[i]*x[i] + a;
 }
@@ -88,25 +89,20 @@ void input() {
 
 int main(void)
 {
-	float *x, *d_x;
-	float **d_w;
-	float **w;
+	float *x, *d_x, *d_w, *w;
 
 	int N = width * height;
 
-	cout << "Starting code......."  << endl;
+	cout << "Starting code....... 124"  << endl;
 
-	x = (float *)malloc( N *sizeof(float));
-	w = (float **)malloc( classes *sizeof(float*));
-	for(int i = 0; i < classes; i++) {
-		w[i] = (float *)malloc( N *sizeof(float));
-	}
+	x = (float *)malloc( N * sizeof(float));
+	w = (float *)malloc( N * classes * sizeof(float));
+//	for(int i = 0; i < classes; i++) {
+//		w[i] = (float *)malloc( N *sizeof(float));
+//	}
 
 	cudaMalloc(&d_x, N *sizeof(float));
-
-	for(int i = 0; i < classes; i++) {
-		cudaMalloc(&d_w[i], N *sizeof(float));
-	}
+	cudaMalloc(&d_w[i], N *sizeof(float));
 
 	image.open(training_image_fn.c_str(), ios::in | ios::binary); // Binary image file
 	label.open(training_label_fn.c_str(), ios::in | ios::binary ); // Binary label file
@@ -138,8 +134,8 @@ int main(void)
 
 	for (int i = 0; i < width * height; i++) {
 		x[i] = (float)d[i % width][i / width];
-		for(int j = 0; j < 10; j++)
-			w[j][i] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+//		for(int j = 0; j < 10; j++)
+//			w[j][i] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 	}
 
 	cout << "Image:" << endl;
@@ -150,35 +146,35 @@ int main(void)
 		cout << endl;
 	}
 	cout << "Label:" << (int)inputNum << endl;
-
-	cudaMemcpy(d_x, x, N * sizeof(float), cudaMemcpyHostToDevice);
-
-	for(int i = 0; i < classes; i++)
-		cudaMemcpy(d_w[i], w[i], N * sizeof(float), cudaMemcpyHostToDevice);
-//	cudaMemcpy(d_w, w, N * sizeof(float), cudaMemcpyHostToDevice);
-//	cudaMemcpy(d_w, w, N * sizeof(float), cudaMemcpyHostToDevice);
-//	cudaMemcpy(d_w, w, N * sizeof(float), cudaMemcpyHostToDevice);
-//	cudaMemcpy(d_w, w, N * sizeof(float), cudaMemcpyHostToDevice);
-
-	// Perform SAXPY on 1M elements
-	int blockSize = 256;
-	int numBlocks = (N + blockSize - 1) / blockSize;
-	saxpy<<<numBlocks, blockSize>>>(N, 2.0f, d_x, d_w[0]);
-
-	cudaMemcpy(w[0], d_w[0], N*sizeof(float), cudaMemcpyDeviceToHost);
-
-	for (int j = 0; j < height; ++j) {
-		for (int i = 0; i < width; ++i) {
-			cout << (float)w[i][(j) * height + (i)] << " ";
-		}
-		cout << endl;
-	}
-	cout << "Label:" << (int)inputNum << endl;
-
-	cudaFree(d_x);
-	for(int i = 0; i < classes; i++)
-		cudaFree(d_w[i]);
-	free(x);
-	for(int i = 0; i < classes; i++)
-		free(w[i]);
+//
+//	cudaMemcpy(d_x, x, N * sizeof(float), cudaMemcpyHostToDevice);
+//
+//	for(int i = 0; i < classes; i++)
+//		cudaMemcpy(d_w[i], w[i], N * sizeof(float), cudaMemcpyHostToDevice);
+////	cudaMemcpy(d_w, w, N * sizeof(float), cudaMemcpyHostToDevice);
+////	cudaMemcpy(d_w, w, N * sizeof(float), cudaMemcpyHostToDevice);
+////	cudaMemcpy(d_w, w, N * sizeof(float), cudaMemcpyHostToDevice);
+////	cudaMemcpy(d_w, w, N * sizeof(float), cudaMemcpyHostToDevice);
+//
+//	// Perform SAXPY on 1M elements
+//	int blockSize = 256;
+//	int numBlocks = (N + blockSize - 1) / blockSize;
+//	saxpy<<<numBlocks, blockSize>>>(N, 2.0f, d_x, d_w[0]);
+//
+//	cudaMemcpy(w[0], d_w[0], N*sizeof(float), cudaMemcpyDeviceToHost);
+//
+//	for (int j = 0; j < height; ++j) {
+//		for (int i = 0; i < width; ++i) {
+//			cout << (float)w[i][(j) * height + (i)] << " ";
+//		}
+//		cout << endl;
+//	}
+//	cout << "Label:" << (int)inputNum << endl;
+//
+//	cudaFree(d_x);
+//	for(int i = 0; i < classes; i++)
+//		cudaFree(d_w[i]);
+//	free(x);
+//	for(int i = 0; i < classes; i++)
+//		free(w[i]);
 }
