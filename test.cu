@@ -19,15 +19,18 @@ const string training_image_fn = "train-images.idx3-ubyte";
 // Training label file name
 const string training_label_fn = "train-labels.idx1-ubyte";
 
+int classes = 10;
 
 __global__
 void saxpy(float n, float a, float *x, float *w)
 {
 	int index = blockIdx.x * blockDim.x + threadIdx.x;
 	int stride = blockDim.x * gridDim.x;
-	printf("%d", index);
+	//printf("%d", index);
+	int classes = 10;
 	for (int i = index; i < n; i += stride)
-		w[i] = w[i]*x[i] + a;
+		for(int k = 0; k < classes; k++)
+			w[i + k * (int)n] = w[i + k * (int)n]*x[i] + a;
 }
 
 __global__
@@ -64,7 +67,7 @@ const int height = 28;
 int d[width][height];
 
 char inputNum;
-int classes = 1;
+
 
 
 
@@ -91,18 +94,16 @@ int main(void)
 {
 	float *x, *d_x, *d_w, *w;
 
+
 	int N = width * height;
 
 	cout << "Starting code....... 124"  << endl;
 
 	x = (float *)malloc( N * sizeof(float));
 	w = (float *)malloc( N * classes * sizeof(float));
-//	for(int i = 0; i < classes; i++) {
-//		w[i] = (float *)malloc( N *sizeof(float));
-//	}
 
-	cudaMalloc(&d_x, N *sizeof(float));
-	cudaMalloc(&d_w[i], N *sizeof(float));
+	cudaMalloc(&d_x, N * sizeof(float));
+	cudaMalloc(&d_w, N * classes * sizeof(float));
 
 	image.open(training_image_fn.c_str(), ios::in | ios::binary); // Binary image file
 	label.open(training_label_fn.c_str(), ios::in | ios::binary ); // Binary label file
@@ -116,13 +117,9 @@ int main(void)
 		label.read(&number, sizeof(char));
 	}
 
-	// Neural Network Initialization
-	//init_array();
-
 	for (int sample = 1; sample <= nTraining; ++sample) {
 		cout << "Sample ---------- **************" << sample << endl;
 
-		// Getting (image, label)
 		input();
 	}
 
@@ -132,10 +129,10 @@ int main(void)
 	label.close();
 
 
-	for (int i = 0; i < width * height; i++) {
+	for (int i = 0; i < N; i++) {
 		x[i] = (float)d[i % width][i / width];
-//		for(int j = 0; j < 10; j++)
-//			w[j][i] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+		for(int j = 0; j < classes; j++)
+			w[i + j * N] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 	}
 
 	cout << "Image:" << endl;
@@ -146,35 +143,35 @@ int main(void)
 		cout << endl;
 	}
 	cout << "Label:" << (int)inputNum << endl;
-//
-//	cudaMemcpy(d_x, x, N * sizeof(float), cudaMemcpyHostToDevice);
-//
-//	for(int i = 0; i < classes; i++)
-//		cudaMemcpy(d_w[i], w[i], N * sizeof(float), cudaMemcpyHostToDevice);
-////	cudaMemcpy(d_w, w, N * sizeof(float), cudaMemcpyHostToDevice);
-////	cudaMemcpy(d_w, w, N * sizeof(float), cudaMemcpyHostToDevice);
-////	cudaMemcpy(d_w, w, N * sizeof(float), cudaMemcpyHostToDevice);
-////	cudaMemcpy(d_w, w, N * sizeof(float), cudaMemcpyHostToDevice);
-//
-//	// Perform SAXPY on 1M elements
-//	int blockSize = 256;
-//	int numBlocks = (N + blockSize - 1) / blockSize;
-//	saxpy<<<numBlocks, blockSize>>>(N, 2.0f, d_x, d_w[0]);
-//
-//	cudaMemcpy(w[0], d_w[0], N*sizeof(float), cudaMemcpyDeviceToHost);
-//
-//	for (int j = 0; j < height; ++j) {
-//		for (int i = 0; i < width; ++i) {
-//			cout << (float)w[i][(j) * height + (i)] << " ";
-//		}
-//		cout << endl;
-//	}
-//	cout << "Label:" << (int)inputNum << endl;
-//
-//	cudaFree(d_x);
-//	for(int i = 0; i < classes; i++)
-//		cudaFree(d_w[i]);
-//	free(x);
-//	for(int i = 0; i < classes; i++)
-//		free(w[i]);
+
+	cudaMemcpy(d_x, x, N * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_w, w, N * classes * sizeof(float), cudaMemcpyHostToDevice);
+
+	// Perform SAXPY on 1M elements
+	int blockSize = 256;
+	int numBlocks = (N + blockSize - 1) / blockSize;
+
+	saxpy<<<numBlocks, blockSize>>>(N, 0.0f, d_x, d_w);
+
+	cudaMemcpy(w, d_w, N*classes*sizeof(float), cudaMemcpyDeviceToHost);
+	//
+	for(int k = 0; k < classes; k++) {
+		for (int j = 0; j < height; ++j) {
+			for (int i = 0; i < width; ++i) {
+				//cout << (float)w[i][(j) * height + (i)] << " ";
+				cout << (int)(w[(j ) * height + (i ) + k * N]*10.0) << "";
+
+			}
+			cout << endl;
+		}
+		cout << "Label:" << (int)inputNum << endl;
+	}
+
+	//
+	//	cudaFree(d_x);
+	//	for(int i = 0; i < classes; i++)
+	//		cudaFree(d_w[i]);
+	//	free(x);
+	//	for(int i = 0; i < classes; i++)
+	//		free(w[i]);
 }
