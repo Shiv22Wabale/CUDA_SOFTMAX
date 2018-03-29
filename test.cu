@@ -167,11 +167,4 @@ int main(void)
 		cout << "Label:" << (int)inputNum << endl;
 	}
 
-	//
-	//	cudaFree(d_x);
-	//	for(int i = 0; i < classes; i++)
-	//		cudaFree(d_w[i]);
-	//	free(x);
-	//	for(int i = 0; i < classes; i++)
-	//		free(w[i]);
 }
