@@ -186,19 +186,6 @@ int main(void)
 	cudaMemcpy(w, d_w, N*classes*sizeof(float), cudaMemcpyDeviceToHost);
 	cudaMemcpy(sum, d_sum, classes*sizeof(float), cudaMemcpyDeviceToHost);
 
-	//	for(int j = 0; j < classes; j++)
-	//		cout << sum[j] << endl;
-
-//	for (int i = 0; i < classes; i += 1) {
-//		//printf("i = %d %f\n", i, sum[i]);
-//		for(int k = 0; k < N; k++) {
-//			//printf("i = %d %f\n",i, sum[i]);
-//			//sum[i] += w[i + k * (int)n];
-//			sum[i] += w[i*N + k];
-//			//printf("%f\n",sum[i]);
-//		}
-//	}
-	//
 	for(int j = 0; j < classes; j++)
 		cout << sum[j] << endl;
 
