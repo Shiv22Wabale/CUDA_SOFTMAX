@@ -189,16 +189,4 @@ int main(void)
 	for(int j = 0; j < classes; j++)
 		cout << sum[j] << endl;
 
-	//
-//	for(int k = 0; k < classes; k++) {
-//		for (int j = 0; j < height; ++j) {
-//			for (int i = 0; i < width; ++i) {
-//				//cout << (float)w[i][(j) * height + (i)] << " ";
-//				cout << (int)(w[(j ) * height + (i ) + k * N]*10.0) << "";
-//			}
-//			cout << endl;
-//		}
-//		cout << "Label:" << (int)inputNum << endl;
-//	}
-
 }
