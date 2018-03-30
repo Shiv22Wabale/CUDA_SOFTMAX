@@ -34,6 +34,25 @@ void saxpy(float n, float a, float *x, float *w)
 }
 
 __global__
+void sum_cuda(float n, float *w, float *sum)
+{
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
+	int stride = blockDim.x * gridDim.x;
+	//printf("Index --- %d", index);
+	int classes = 10;
+	for (int i = index; i < classes; i += stride) {
+		//printf("i = %d %f\n", i, sum[i]);
+		for(int k = 0; k < n; k++) {
+			//printf("i = %d %f\n",i, sum[i]);
+			//sum[i] += w[i + k * (int)n];
+			sum[i] += w[i*(int)n + k];
+			//printf("%f\n",sum[i]);
+		}
+		//printf("cuda --- %f\n",sum[i]);
+	}
+}
+
+__global__
 void softMax(float n, float a, float *x, float *w)
 {
 	int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -92,8 +111,7 @@ void input() {
 
 int main(void)
 {
-	float *x, *d_x, *d_w, *w;
-
+	float *x, *d_x, *d_w, *w, *sum, *d_sum;
 
 	int N = width * height;
 
@@ -101,9 +119,11 @@ int main(void)
 
 	x = (float *)malloc( N * sizeof(float));
 	w = (float *)malloc( N * classes * sizeof(float));
+	sum = (float *)malloc( classes * sizeof(float));
 
 	cudaMalloc(&d_x, N * sizeof(float));
 	cudaMalloc(&d_w, N * classes * sizeof(float));
+	cudaMalloc(&d_sum, classes * sizeof(float));
 
 	image.open(training_image_fn.c_str(), ios::in | ios::binary); // Binary image file
 	label.open(training_label_fn.c_str(), ios::in | ios::binary ); // Binary label file
@@ -135,6 +155,9 @@ int main(void)
 			w[i + j * N] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 	}
 
+	for(int j = 0; j < classes; j++)
+		sum[j] = 0;
+
 	cout << "Image:" << endl;
 	for (int j = 0; j < height; ++j) {
 		for (int i = 0; i < width; ++i) {
@@ -146,6 +169,7 @@ int main(void)
 
 	cudaMemcpy(d_x, x, N * sizeof(float), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_w, w, N * classes * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_sum, sum, classes * sizeof(float), cudaMemcpyHostToDevice);
 
 	// Perform SAXPY on 1M elements
 	int blockSize = 256;
@@ -153,18 +177,41 @@ int main(void)
 
 	saxpy<<<numBlocks, blockSize>>>(N, 0.0f, d_x, d_w);
 
-	cudaMemcpy(w, d_w, N*classes*sizeof(float), cudaMemcpyDeviceToHost);
-	//
-	for(int k = 0; k < classes; k++) {
-		for (int j = 0; j < height; ++j) {
-			for (int i = 0; i < width; ++i) {
-				//cout << (float)w[i][(j) * height + (i)] << " ";
-				cout << (int)(w[(j ) * height + (i ) + k * N]*10.0) << "";
+	blockSize = 256;
+	numBlocks = (classes + blockSize - 1) / blockSize;
 
-			}
-			cout << endl;
-		}
-		cout << "Label:" << (int)inputNum << endl;
-	}
+	sum_cuda<<<numBlocks, blockSize>>>(N, d_w, d_sum);
+	//sum_cuda<<<1, 10>>>(N, d_w, d_sum);
+
+	cudaMemcpy(w, d_w, N*classes*sizeof(float), cudaMemcpyDeviceToHost);
+	cudaMemcpy(sum, d_sum, classes*sizeof(float), cudaMemcpyDeviceToHost);
+
+	//	for(int j = 0; j < classes; j++)
+	//		cout << sum[j] << endl;
+
+//	for (int i = 0; i < classes; i += 1) {
+//		//printf("i = %d %f\n", i, sum[i]);
+//		for(int k = 0; k < N; k++) {
+//			//printf("i = %d %f\n",i, sum[i]);
+//			//sum[i] += w[i + k * (int)n];
+//			sum[i] += w[i*N + k];
+//			//printf("%f\n",sum[i]);
+//		}
+//	}
+	//
+	for(int j = 0; j < classes; j++)
+		cout << sum[j] << endl;
+
+	//
+//	for(int k = 0; k < classes; k++) {
+//		for (int j = 0; j < height; ++j) {
+//			for (int i = 0; i < width; ++i) {
+//				//cout << (float)w[i][(j) * height + (i)] << " ";
+//				cout << (int)(w[(j ) * height + (i ) + k * N]*10.0) << "";
+//			}
+//			cout << endl;
+//		}
+//		cout << "Label:" << (int)inputNum << endl;
+//	}
 
 }
