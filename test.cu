@@ -34,31 +34,39 @@ void saxpy(float n, float a, float *x, float *w)
 }
 
 __global__
-void sum_cuda(float n, float *w, float *sum)
+void sum_cuda(float n, float *sum, float *total)
 {
 	int index = blockIdx.x * blockDim.x + threadIdx.x;
 	int stride = blockDim.x * gridDim.x;
 	//printf("Index --- %d", index);
 	int classes = 10;
-	for (int i = index; i < classes; i += stride) {
+	for (int idx = index; idx < n; idx += stride)
+			for(int k = 0; k < classes; k++) {
+				register int i = atomicAdd(total, sum[idx]);
+				sum[i] = idx;
+			}
+
+	//for (int idx = index; idx < classes; idx += stride) {
 		//printf("i = %d %f\n", i, sum[i]);
-		for(int k = 0; k < n; k++) {
-			//printf("i = %d %f\n",i, sum[i]);
-			//sum[i] += w[i + k * (int)n];
-			sum[i] += w[i*(int)n + k];
-			//printf("%f\n",sum[i]);
-		}
+//		for(int k = 0; k < n; k++) {
+//			//printf("i = %d %f\n",i, sum[i]);
+//			//sum[i] += w[i + k * (int)n];
+//			sum[i] += w[i*(int)n + k];
+//			//printf("%f\n",sum[i]);
+//		}
+	//	register int i = atomicAdd(total, sum[idx]);
+	//	sum[i] = idx;
 		//printf("cuda --- %f\n",sum[i]);
-	}
+	//}
 }
 
-__global__
-void softMax(float n, float a, float *x, float *w)
+void softMax(float *sum)
 {
-	int index = blockIdx.x * blockDim.x + threadIdx.x;
-	int stride = blockDim.x * gridDim.x;
-	for (int i = index; i < n; i += stride)
-		w[i] = w[i]*x[i] + a;
+	float total = 0.0f;
+	for (int i = 0; i < classes; i += 1)
+		total += exp(sum[i]);
+	for (int i = 0; i < classes; i += 1)
+		sum[i] = exp(sum[i]) / total;
 }
 
 // Software: Training Artificial Neural Network for MNIST database
@@ -109,9 +117,17 @@ void input() {
 	}
 }
 
+void check(float *sum){
+	float total = 0.0f;
+	for(int j = 0; j < classes; j++)
+		total += sum[j];
+
+	cout<<total<< endl;
+}
+
 int main(void)
 {
-	float *x, *d_x, *d_w, *w, *sum, *d_sum;
+	float *x, *d_x, *d_w, *w, *sum, *d_sum, *total, *d_total;
 
 	int N = width * height;
 
@@ -120,10 +136,12 @@ int main(void)
 	x = (float *)malloc( N * sizeof(float));
 	w = (float *)malloc( N * classes * sizeof(float));
 	sum = (float *)malloc( classes * sizeof(float));
+	total = (float *)malloc( classes * sizeof(float) );
 
 	cudaMalloc(&d_x, N * sizeof(float));
 	cudaMalloc(&d_w, N * classes * sizeof(float));
 	cudaMalloc(&d_sum, classes * sizeof(float));
+	cudaMalloc(&d_total, classes * sizeof(float));
 
 	image.open(training_image_fn.c_str(), ios::in | ios::binary); // Binary image file
 	label.open(training_label_fn.c_str(), ios::in | ios::binary ); // Binary label file
@@ -170,6 +188,7 @@ int main(void)
 	cudaMemcpy(d_x, x, N * sizeof(float), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_w, w, N * classes * sizeof(float), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_sum, sum, classes * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_total, total, sizeof(float), cudaMemcpyHostToDevice);
 
 	// Perform SAXPY on 1M elements
 	int blockSize = 256;
@@ -177,10 +196,15 @@ int main(void)
 
 	saxpy<<<numBlocks, blockSize>>>(N, 0.0f, d_x, d_w);
 
-	blockSize = 256;
+	cudaMemcpy(w, d_w, N*classes*sizeof(float), cudaMemcpyDeviceToDevice);
+	//cudaMemcpy(sum, d_sum, classes*sizeof(float), cudaMemcpyDeviceToHost);
+
+	blockSize = 27*27;
 	numBlocks = (classes + blockSize - 1) / blockSize;
 
-	sum_cuda<<<numBlocks, blockSize>>>(N, d_w, d_sum);
+	sum_cuda<<<numBlocks, blockSize>>>(N, d_sum, d_total);
+
+
 	//sum_cuda<<<1, 10>>>(N, d_w, d_sum);
 
 	cudaMemcpy(w, d_w, N*classes*sizeof(float), cudaMemcpyDeviceToHost);
@@ -189,4 +213,13 @@ int main(void)
 	for(int j = 0; j < classes; j++)
 		cout << sum[j] << endl;
 
+	softMax(sum);
+
+	for(int j = 0; j < classes; j++)
+		cout << sum[j] << endl;
+
+	check(sum);
+
+	cout << distance(sum, max_element(sum, sum + classes )) << endl;
 }
+
