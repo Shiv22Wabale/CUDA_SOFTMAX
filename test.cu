@@ -117,9 +117,9 @@ void input() {
 	}
 }
 
-void check(float *sum){
+void check(float *sum, int N){
 	float total = 0.0f;
-	for(int j = 0; j < classes; j++)
+	for(int j = 0; j < N; j++)
 		total += sum[j];
 
 	cout<<total<< endl;
@@ -204,24 +204,8 @@ int main(void)
 
 	saxpy<<<numBlocks, blockSize>>>(N, 0.0f, d_x, d_w);
 
-	//cudaMemcpy(d_w, d_sum, N*classes*sizeof(float), cudaMemcpyDeviceToDevice);
-	cudaMemcpy(w, d_w, N*classes*sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(d_sum, w, N * classes * sizeof(float), cudaMemcpyHostToDevice);
-	cudaMemcpy(sum, d_sum, N*classes*sizeof(float), cudaMemcpyDeviceToHost);
-	//cudaMemcpy(sum, d_sum, classes*sizeof(float), cudaMemcpyDeviceToHost);
+	cudaMemcpy(d_sum, d_w, N*classes*sizeof(float), cudaMemcpyDeviceToDevice);
 
-//	for(int j = 0; j < N; ++j)
-//			cout << sum[j] << " ";
-//	cout << endl;
-
-	float temp = 0;
-	for(int j = 0; j < N; ++j) {
-			cout << w[j] << " ";
-			temp += w[j];
-	}
-
-	cout << endl;
-	cout << temp << endl;
 
 	blockSize = 27*27;
 	numBlocks = (classes + blockSize - 1) / blockSize;
@@ -234,10 +218,7 @@ int main(void)
 	//cudaMemcpy(d_index, &h_index , sizeof(int), cudaMemcpyHostToDevice);
 	cudaMemcpy(&h_index , d_index, sizeof(int), cudaMemcpyDeviceToHost);
 
-	for(int j = 0; j < N; ++j)
-				cout << sum[j] << " ";
-		cout << endl;
-
+	check(w, N);
 	cout << h_index;
 }
 
