@@ -34,29 +34,29 @@ void saxpy(float n, float a, float *x, float *w)
 }
 
 __global__
-void sum_cuda(float n, float *sum, float *total)
+void sum_cuda(float n, float *sum, float *total, int run)
 {
 	int index = blockIdx.x * blockDim.x + threadIdx.x;
 	int stride = blockDim.x * gridDim.x;
 	//printf("Index --- %d", index);
 	int classes = 1;
 	for (int idx = index; idx < n; idx += stride) {
-			for(int k = 0; k < classes; k++) {
-				register int i = atomicAdd(total, sum[idx]);
-				sum[i] = idx;
-			}
+		//for(int k = 0; k < classes; k++) {
+			register int i = atomicAdd(&total[0], sum[idx + run * (int)n]);
+			sum[i + run * (int)n] = idx;
+		//}
 	}
 	//for (int idx = index; idx < classes; idx += stride) {
-		//printf("i = %d %f\n", i, sum[i]);
-//		for(int k = 0; k < n; k++) {
-//			//printf("i = %d %f\n",i, sum[i]);
-//			//sum[i] += w[i + k * (int)n];
-//			sum[i] += w[i*(int)n + k];
-//			//printf("%f\n",sum[i]);
-//		}
+	//printf("i = %d %f\n", i, sum[i]);
+	//		for(int k = 0; k < n; k++) {
+	//			//printf("i = %d %f\n",i, sum[i]);
+	//			//sum[i] += w[i + k * (int)n];
+	//			sum[i] += w[i*(int)n + k];
+	//			//printf("%f\n",sum[i]);
+	//		}
 	//	register int i = atomicAdd(total, sum[idx]);
 	//	sum[i] = idx;
-		//printf("cuda --- %f\n",sum[i]);
+	//printf("cuda --- %f\n",sum[i]);
 	//}
 }
 
@@ -130,7 +130,7 @@ int main(void)
 	float *x, *d_x, *d_w, *w, *sum, *d_sum;
 	//float total = 0, *d_total = 0;
 	float *d_index = 0;
-	float h_index = 0;
+	float *h_index = 0;
 
 	int N = width * height;
 
@@ -139,7 +139,11 @@ int main(void)
 	x = (float *)malloc( N * sizeof(float));
 	w = (float *)malloc( N * classes * sizeof(float));
 	sum = (float *)malloc( N * classes * sizeof(float));
+	h_index = (float *)malloc( classes * sizeof(float));
 	//total = (float *)malloc( classes * sizeof(float) );
+
+	for(int i = 0; i < classes; i++)
+		h_index[i] = 0;
 
 	/***************** Image Loading **********************/
 	image.open(training_image_fn.c_str(), ios::in | ios::binary); // Binary image file
@@ -190,13 +194,12 @@ int main(void)
 	cudaMalloc(&d_w, N * classes * sizeof(float));
 	cudaMalloc(&d_sum, N * classes * sizeof(float));
 	//cudaMalloc(&d_total, classes * sizeof(float));
-	cudaMalloc( (void**) &d_index, sizeof(float) );
+	cudaMalloc( (void**) &d_index, classes * sizeof(float) );
 
 	cudaMemcpy(d_x, x, N * sizeof(float), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_w, w, N * classes * sizeof(float), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_sum, sum, N * classes * sizeof(float), cudaMemcpyHostToDevice);
 	//cudaMemcpy(d_total, total, sizeof(float), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_index, &h_index , sizeof(float), cudaMemcpyHostToDevice);
 
 	// Perform SAXPY on 1M elements
 	int blockSize = 256;
@@ -211,14 +214,19 @@ int main(void)
 	numBlocks = (classes + blockSize - 1) / blockSize;
 
 
-	sum_cuda<<<numBlocks, blockSize>>>(N, d_sum, d_index);
 
-	cudaMemcpy(w, d_w, N*classes*sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(sum, d_sum, classes*sizeof(float), cudaMemcpyDeviceToHost);
-	//cudaMemcpy(d_index, &h_index , sizeof(int), cudaMemcpyHostToDevice);
-	cudaMemcpy(&h_index , d_index, sizeof(int), cudaMemcpyDeviceToHost);
 
-	check(w, N);
-	cout << h_index;
+	for(int k = 0; k < classes; ++k) {
+		h_index[0] = 0;
+		cudaMemcpy(d_index, h_index , classes * sizeof(float), cudaMemcpyHostToDevice);
+
+		sum_cuda<<<numBlocks, blockSize>>>(N, d_sum, d_index, k);
+
+		cudaMemcpy(w, d_w, N*classes*sizeof(float), cudaMemcpyDeviceToHost);
+		cudaMemcpy(h_index , d_index, classes * sizeof(int), cudaMemcpyDeviceToHost);
+		check(w + k * N, N);
+		cout << h_index[0] << endl;
+	}
+
 }
 
