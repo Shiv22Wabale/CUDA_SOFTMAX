@@ -10,6 +10,7 @@
 #include <set>
 #include <iterator>
 #include <algorithm>
+#include <time.h>
 
 using namespace std;
 
@@ -209,24 +210,29 @@ int main(void)
 
 	cudaMemcpy(d_sum, d_w, N*classes*sizeof(float), cudaMemcpyDeviceToDevice);
 
-
-	blockSize = 27*27;
+	blockSize = 27 * 27;
 	numBlocks = (classes + blockSize - 1) / blockSize;
-
-
-
 
 	for(int k = 0; k < classes; ++k) {
 		h_index[0] = 0;
 		cudaMemcpy(d_index, h_index , classes * sizeof(float), cudaMemcpyHostToDevice);
 
+		clock_t t;
+		t = clock();
 		sum_cuda<<<numBlocks, blockSize>>>(N, d_sum, d_index, k);
+		t = clock() - t;
+		double time_taken = ((double)t)/CLOCKS_PER_SEC; // in seconds
+		printf("sum_cuda took %f seconds to execute on CUDA \n", time_taken);
 
 		cudaMemcpy(w, d_w, N*classes*sizeof(float), cudaMemcpyDeviceToHost);
 		cudaMemcpy(h_index , d_index, classes * sizeof(int), cudaMemcpyDeviceToHost);
+
+		t = clock();
 		check(w + k * N, N);
+		t = clock() - t;
+		time_taken = ((double)t)/CLOCKS_PER_SEC; // in seconds
+		printf("check took %f seconds to execute on CPU\n", time_taken);
+
 		cout << h_index[0] << endl;
 	}
-
 }
-
