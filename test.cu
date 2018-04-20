@@ -75,7 +75,7 @@ void updateWeights(float n, float *err, float *w, float *x)
 		for(int k = 0; k < classes; k++) {
 			//printf(" %f  ", w[i + k * (int)n] );
 			//a = w[i + k * (int)n];
-			w[i + k * (int)n] += (-0.001 * err[k]) * x[i];
+			w[i + k * (int)n] -= 0.001 * ( ( -1 * err[k] * x[i] ) + w[i + k * (int)n] );
 			//printf(" %f  after %f changes required %f\n", a, w[i + k * (int)n], err[k] );
 		}
 	//printf(" after changes required %f\n", err[0] );
@@ -128,9 +128,9 @@ void input() {
 			for (int i = 0; i < width; ++i) {
 				image.read(&inputNum, sizeof(char));
 				if (inputNum == 0) {
-					d[i][j] = 1;
-				} else {
 					d[i][j] = 0;
+				} else {
+					d[i][j] = 1;
 				}
 			}
 		}
@@ -192,7 +192,7 @@ int main(void)
 
 	/***************** *****************/
 	//cudaMemcpy(w, d_w, N * classes * sizeof(float), cudaMemcpyDeviceToHost);
-	for(int k = 2; k < 3; k++) {
+	for(int k = 9; k < 10; k++) {
 		for (int j = 0; j < height; ++j) {
 			for (int i = 0; i < width; ++i) {
 				cout <<  " " << w[ (j ) * height + (i ) + k * N];
@@ -225,7 +225,7 @@ int main(void)
 		label.read(&number, sizeof(char));
 	}
 
-	for(int l = 0; l < 1000; l++) {
+	for(int l = 0; l < 5000; l++) {
 
 		/***************** Image Loading **********************/
 
@@ -266,29 +266,33 @@ int main(void)
 
 
 		/********* Multiplying ******************/
-
+		clock_t t, t1, t2;
+		t = clock();
+		t1 = clock();
 		cudaMemcpy(d_x, x, N * sizeof(float), cudaMemcpyHostToDevice);
 
 		// Perform SAXPY on 1M elements
-		int blockSize = 256;
+		//int blockSize = 27;
+		int blockSize = N;
 		int numBlocks = (N + blockSize - 1) / blockSize;
+
 
 		saxpy<<<numBlocks, blockSize>>>(N, 0.0f, d_x, d_w, d_sum);
 		/********* Multiplying ******************/
 
 		/***************** *****************/
-//		cudaMemcpy(w, d_sum, N * classes * sizeof(float), cudaMemcpyDeviceToHost);
-//		for(int k = 2; k < 3; k++) {
-//			for (int j = 0; j < height; ++j) {
-//				for (int i = 0; i < width; ++i) {
-//					cout << " " << w[ (j ) * height + (i ) + k * N];
-//				}
-//				cout << endl;
-//			}
-//		}
-//		cout << endl;
-//		cout << endl;
-//		cout << endl;
+		//		cudaMemcpy(w, d_sum, N * classes * sizeof(float), cudaMemcpyDeviceToHost);
+		//		for(int k = 2; k < 3; k++) {
+		//			for (int j = 0; j < height; ++j) {
+		//				for (int i = 0; i < width; ++i) {
+		//					cout << " " << w[ (j ) * height + (i ) + k * N];
+		//				}
+		//				cout << endl;
+		//			}
+		//		}
+		//		cout << endl;
+		//		cout << endl;
+		//		cout << endl;
 		/***************** *****************/
 
 
@@ -308,26 +312,22 @@ int main(void)
 			cudaMemcpy(h_index , d_index, classes * sizeof(int), cudaMemcpyDeviceToHost);
 
 			total[k] = h_index[0];
-			//			cout << h_index[0] << endl;
+//						cout << total[k] << endl;
 			//			check( sum + k * N, N);
 			//summation += total[k];
-		}
-		for(int k = 0; k < classes; ++k) {
-			//total[k] = total[k] / summation;
-			//				cout << total[k] << endl;
-
 			max_index = total[k] > total[max_index] ? k : max_index;
 		}
 		for(int k = 0; k < classes; ++k) {
 			//total[k] = total[k] / summation;
 			//				cout << total[k] << endl;
-			total[k] = total[k] - total[max_index];
+			total[k] = total[k] / total[max_index];
 			summation += total[k];
 			//max_index = total[k] > total[max_index] ? k : max_index;
 		}
 		for(int k = 0; k < classes; ++k) {
 			total[k] = total[k] / summation;
-			//cout << total[k] << endl;
+//			cout << total[k] << endl;
+			max_index = total[k] > total[max_index] ? k : max_index;
 			//			total[k] = total[k] - total[max_index];
 			//			summation += total[k];
 			//max_index = total[k] > total[max_index] ? k : max_index;
@@ -349,9 +349,9 @@ int main(void)
 
 		for(int k = 0; k < classes; k++) {
 			err[k] = hostNum[k] - total[k];
-			//					cout << " e: " << err[k];
+//								cout << " e: " << err[k];
 		}
-		//	cout << endl;
+			cout << endl;
 
 		cudaMemcpy(d_err, err, classes * sizeof(float), cudaMemcpyHostToDevice);
 		/*********** Finding Error ************************/
@@ -365,6 +365,13 @@ int main(void)
 
 
 		/************* Updating the weights *******************/
+
+		t = clock() - t;
+		t2 = clock();
+		double time_taken = ((double)t)/CLOCKS_PER_SEC; // in seconds
+		cout << " saxpy took " << time_taken << "seconds to execute on CUDA " << CLOCKS_PER_SEC << " the t1 = " << t1 << " and t2 = " << t2 << endl;
+		//cout << endl;
+
 
 
 	}
@@ -383,13 +390,15 @@ int main(void)
 
 	/***************** *****************/
 	cudaMemcpy(w, d_w, N * classes * sizeof(float), cudaMemcpyDeviceToHost);
-	for(int k = 2; k < 3; k++) {
+	for(int k = 0; k < 10; k++) {
 		for (int j = 0; j < height; ++j) {
 			for (int i = 0; i < width; ++i) {
-				cout << " " << w[ (j ) * height + (i ) + k * N];
+				cout << " " << (int) ( w[ (j ) * height + (i ) + k * N] * 200);
 			}
 			cout << endl;
 		}
+		cout << endl;
+		cout << endl;
 	}
 	/***************** *****************/
 
